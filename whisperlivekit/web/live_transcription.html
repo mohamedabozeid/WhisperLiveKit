@@ -392,34 +392,37 @@
 
                 // Handle messages from server
                 websocket.onmessage = (event) => {
-                    const data = JSON.parse(event.data);
-                    
-                    // Check for status messages
-                    if (data.type === "ready_to_stop") {
-                        console.log("Ready to stop received, finalizing display and closing WebSocket.");
-                        waitingForStop = false;
-
-                        if (lastReceivedData) {
-                            renderLinesWithBuffer(
-                                lastReceivedData.lines || [],
-                                lastReceivedData.buffer_diarization || "",
-                                lastReceivedData.buffer_transcription || "",
-                                0, // No more lag
-                                0, // No more lag
-                                true // isFinalizing = true
-                            );
-                        }
-                        statusText.textContent = "Finished processing audio! Ready to record again.";
-                        recordButton.disabled = false;
+                    console.log("WebSocket message received:", event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log("Parsed WebSocket data:", data);
                         
-                        if (websocket) {
-                            websocket.close(); // will trigger onclose
-                            // websocket = null; // onclose handle setting websocket to null
+                        // Check for status messages
+                        if (data.type === "ready_to_stop") {
+                            console.log("Ready to stop received, finalizing display and closing WebSocket.");
+                            waitingForStop = false;
+
+                            if (lastReceivedData) {
+                                renderLinesWithBuffer(
+                                    lastReceivedData.lines || [],
+                                    lastReceivedData.buffer_diarization || "",
+                                    lastReceivedData.buffer_transcription || "",
+                                    0, // No more lag
+                                    0, // No more lag
+                                    true // isFinalizing = true
+                                );
+                            }
+                            statusText.textContent = "Finished processing audio! Ready to record again.";
+                            recordButton.disabled = false;
+                            
+                            if (websocket) {
+                                websocket.close(); // will trigger onclose
+                                // websocket = null; // onclose handle setting websocket to null
+                            }
+                            return;
                         }
-                        return;
-                    }
-                    
-                    lastReceivedData = data; 
+                        
+                        lastReceivedData = data;
                     
                     // Handle normal transcription updates
                     const { 
@@ -431,6 +434,7 @@
                         status = "active_transcription"
                     } = data;
                     
+                    console.log("Rendering with lines:", lines.length, "buffer:", buffer_transcription, buffer_diarization);
                     renderLinesWithBuffer(
                         lines, 
                         buffer_diarization, 
@@ -440,6 +444,9 @@
                         false,
                         status
                     );
+                    } catch (error) {
+                        console.error("Error processing WebSocket message:", error, "Raw data:", event.data);
+                    }
                 };
             });
         }
@@ -549,7 +556,23 @@
 
         async function startRecording() {
             try {
+                console.log("Requesting microphone access...");
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log("Microphone access granted", stream.getAudioTracks().length > 0 ? "with audio tracks" : "but no audio tracks!");
+                
+                if (stream.getAudioTracks().length === 0) {
+                    statusText.textContent = "No audio tracks found in microphone stream";
+                    console.error("No audio tracks in stream");
+                    return;
+                }
+
+                // Check if audio track is enabled
+                const audioTrack = stream.getAudioTracks()[0];
+                if (!audioTrack.enabled) {
+                    statusText.textContent = "Audio track is disabled. Please check microphone permissions.";
+                    console.error("Audio track is disabled");
+                    return;
+                }
                 
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
@@ -557,13 +580,69 @@
                 microphone = audioContext.createMediaStreamSource(stream);
                 microphone.connect(analyser);
                 
-                recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+                // Test if MediaRecorder is available
+                if (typeof MediaRecorder === 'undefined') {
+                    statusText.textContent = "MediaRecorder API is not supported in this browser";
+                    console.error("MediaRecorder not supported");
+                    return;
+                }
+                
+                // Try with different MIME types if needed
+                let mimeType = "audio/webm";
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    console.log("audio/webm not supported, trying audio/ogg");
+                    mimeType = "audio/ogg";
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        console.log("audio/ogg not supported, trying default");
+                        mimeType = '';
+                    }
+                }
+                
+                try {
+                    // Try with audio constraints to get better quality
+                    const options = {};
+                    if (mimeType) {
+                        options.mimeType = mimeType;
+                    }
+                    // Add audio bitrate for better quality if browser supports it
+                    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                        options.mimeType = 'audio/webm;codecs=opus';
+                    }
+                    
+                    // Options for better audio quality
+                    options.audioBitsPerSecond = 128000;
+                    
+                    recorder = new MediaRecorder(stream, options);
+                    console.log("MediaRecorder created with mime type:", options.mimeType || "default", 
+                                "and bitrate:", options.audioBitsPerSecond);
+                } catch (err) {
+                    console.error("Failed to create MediaRecorder:", err.message);
+                    statusText.textContent = "Failed to initialize audio recording: " + err.message;
+                    return;
+                }
+                
                 recorder.ondataavailable = (e) => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN) {
-                        websocket.send(e.data);
+                    if (e.data && e.data.size > 0) {
+                        console.log(`Audio data received: ${e.data.size} bytes`);
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            console.log("Sending audio data to WebSocket");
+                            websocket.send(e.data);
+                        } else {
+                            console.warn("WebSocket not ready to send data:", 
+                                         websocket ? `state: ${websocket.readyState}` : "websocket is null");
+                        }
+                    } else {
+                        console.warn("Empty audio data received");
                     }
                 };
+
+                recorder.onerror = (event) => {
+                    console.error("MediaRecorder error:", event);
+                    statusText.textContent = "Recording error: " + event.name;
+                };
+                
                 recorder.start(chunkDuration);
+                console.log("MediaRecorder started with state:", recorder.state);
                 
                 startTime = Date.now();
                 timerInterval = setInterval(updateTimer, 1000);
@@ -572,8 +651,8 @@
                 isRecording = true;
                 updateUI();
             } catch (err) {
-                statusText.textContent = "Error accessing microphone. Please allow microphone access.";
-                console.error(err);
+                statusText.textContent = "Error accessing microphone: " + err.message;
+                console.error("Microphone access error:", err);
             }
         }
 
@@ -589,7 +668,20 @@
             }
             
             if (recorder) {
-                recorder.stop();
+                try {
+                    recorder.stop();
+                    console.log("MediaRecorder stopped");
+                    
+                    // Stop all tracks in the stream
+                    if (recorder.stream) {
+                        recorder.stream.getTracks().forEach(track => {
+                            console.log(`Stopping track: ${track.kind}`);
+                            track.stop();
+                        });
+                    }
+                } catch (err) {
+                    console.error("Error stopping recorder:", err);
+                }
                 recorder = null;
             }
             
@@ -638,15 +730,24 @@
                 try {
                     // If we have an active WebSocket that's still processing, just restart audio capture
                     if (websocket && websocket.readyState === WebSocket.OPEN) {
+                        console.log("WebSocket connection already open, starting recording");
                         await startRecording();
                     } else {
                         // If no active WebSocket or it's closed, create new one
+                        console.log("Setting up new WebSocket connection");
                         await setupWebSocket();
-                        await startRecording();
+                        // Wait a moment to ensure WebSocket is properly initialized
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            console.log("WebSocket connection ready, starting recording");
+                            await startRecording();
+                        } else {
+                            throw new Error("WebSocket did not open properly.");
+                        }
                     }
                 } catch (err) {
                     statusText.textContent = "Could not connect to WebSocket or access mic. Aborted.";
-                    console.error(err);
+                    console.error("Error during setup:", err);
                 }
             } else {
                 console.log("Stopping recording");
