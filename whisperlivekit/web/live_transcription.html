@@ -323,7 +323,17 @@
         const host = window.location.hostname || "localhost";
         const port = window.location.port || "8000";
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const defaultWebSocketUrl = `${protocol}://${host}:${port}/asr`;
+        
+        // Handle RunPod proxy URLs and other cloud platforms where port is in hostname
+        let defaultWebSocketUrl;
+        if (window.location.port) {
+            // Standard deployment with explicit port
+            defaultWebSocketUrl = `${protocol}://${host}:${port}/asr`;
+        } else {
+            // Cloud deployment (RunPod, etc.) where port is embedded in hostname
+            defaultWebSocketUrl = `${protocol}://${host}/asr`;
+        }
+        
         websocketInput.value = defaultWebSocketUrl;
         websocketUrl = defaultWebSocketUrl;
 
