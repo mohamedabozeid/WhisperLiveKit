@@ -327,3 +327,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 
 whisperlivekit-server --language auto  --backend mlx-whisper --model large --task translate
+
+docker build --platform linux/amd64 -t mohamedabozeid/whisperlivekit:latest --push .

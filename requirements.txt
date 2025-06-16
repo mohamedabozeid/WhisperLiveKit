@@ -1,0 +1,27 @@
+# Core dependencies from setup.py
+fastapi>=0.68.0
+ffmpeg-python>=0.2.0
+librosa>=0.8.1
+soundfile>=0.10.3
+faster-whisper>=0.10.0
+uvicorn[standard]>=0.15.0
+websockets>=10.0
+
+# Optional dependencies (uncomment as needed)
+# For diarization support:
+# diart
+
+# For voice activity controller:
+# torch
+
+# For sentence processing:
+# mosestokenizer
+# wtpsplit
+
+# For different Whisper backends:
+# whisper
+# whisper-timestamped
+# mlx-whisper
+
+# For OpenAI API:
+# openai
