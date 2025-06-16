@@ -78,5 +78,5 @@ EXPOSE 8000
 
 ENTRYPOINT ["whisperlivekit-server", "--host", "0.0.0.0"]
 
-# Default args
-CMD ["--model", "tiny.en"]
+# Default args - each argument must be a separate string in the array
+CMD ["--model", "large", "--language", "auto", "--task", "translate"]
