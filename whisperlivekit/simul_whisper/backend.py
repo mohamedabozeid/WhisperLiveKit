@@ -143,6 +143,11 @@ class SimulStreamingOnlineProcessor:
         except Exception as e:
             logger.exception(f"SimulStreaming warmup failed: {e}")
 
+    def update_config(self, config: dict):
+        """Update configuration dynamically."""
+        if hasattr(self.model, 'update_config'):
+            self.model.update_config(config)
+            
     def __del__(self):
         gc.collect()
         if not getattr(self.asr, 'use_full_mlx', True) and torch is not None:

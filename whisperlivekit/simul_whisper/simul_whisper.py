@@ -279,6 +279,31 @@ class AlignAtt:
         self.state.log_segments += 1
         self.state.pending_incomplete_tokens = []
 
+    def update_config(self, config: dict):
+        """Update decoding options and recreate tokenizer if needed."""
+        changes = False
+        new_options = self.decode_options
+        
+        if "task" in config:
+            new_task = config["task"]
+            if new_task in ["transcribe", "translate"] and new_task != new_options.task:
+                new_options = replace(new_options, task=new_task)
+                changes = True
+                
+        if "language" in config:
+            new_lang = config["language"]
+            if new_lang != new_options.language:
+                new_options = replace(new_options, language=new_lang)
+                changes = True
+        
+        if changes:
+            logger.info(f"Updating decoding options: {config}")
+            self.decode_options = new_options
+            # Recreate tokenizer with new task/language
+            self.create_tokenizer(language=self.decode_options.language)
+            # Reset state
+            self.refresh_segment(complete=True)
+
     def fire_at_boundary(self, chunked_encoder_feature: torch.Tensor):
         if self.state.always_fire: 
             return True

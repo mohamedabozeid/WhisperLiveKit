@@ -632,3 +632,8 @@ class AudioProcessor:
 
         if not self.args.transcription and not self.args.diarization:
             await asyncio.sleep(0.1)
+
+    async def update_config(self, config: dict) -> None:
+        """Update configuration dynamically."""
+        if self.transcription and hasattr(self.transcription, 'update_config'):
+            await asyncio.to_thread(self.transcription.update_config, config)

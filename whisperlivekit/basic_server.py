@@ -72,8 +72,23 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            message = await websocket.receive_bytes()
-            await audio_processor.process_audio(message)
+            # message = await websocket.receive_bytes()
+            # await audio_processor.process_audio(message)
+            message = await websocket.receive()
+            if message["type"] == "websocket.receive":
+                if "bytes" in message and message["bytes"]:
+                    await audio_processor.process_audio(message["bytes"])
+                elif "text" in message and message["text"]:
+                    try:
+                        import json
+                        config = json.loads(message["text"])
+                        if "task" in config or "language" in config:
+                            await audio_processor.update_config(config)
+                            logger.info(f"Updated config: {config}")
+                    except json.JSONDecodeError:
+                        logger.warning(f"Received invalid JSON text: {message['text']}")
+                    except Exception as e:
+                        logger.error(f"Error processing config message: {e}")
     except KeyError as e:
         if 'bytes' in str(e):
             logger.warning(f"Client has closed the connection.")

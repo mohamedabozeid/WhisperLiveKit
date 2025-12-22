@@ -44,6 +44,7 @@ const websocketDefaultSpan = document.getElementById("wsDefaultUrl");
 const linesTranscriptDiv = document.getElementById("linesTranscript");
 const timerElement = document.querySelector(".timer");
 const themeRadios = document.querySelectorAll('input[name="theme"]');
+const taskRadios = document.querySelectorAll('input[name="task"]');
 const microphoneSelect = document.getElementById("microphoneSelect");
 
 const settingsToggle = document.getElementById("settingsToggle");
@@ -114,6 +115,27 @@ if (darkMq && darkMq.addEventListener) {
 } else if (darkMq && darkMq.addListener) {
   // deprecated, but included for Safari compatibility
   darkMq.addListener(handleOsThemeChange);
+}
+
+// Task handling
+function sendConfigUpdate(config) {
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify(config));
+    console.log("Sent config update:", config);
+  }
+}
+
+const savedTaskPref = localStorage.getItem("taskPreference") || "transcribe";
+if (taskRadios.length) {
+  taskRadios.forEach((r) => {
+    r.checked = r.value === savedTaskPref;
+    r.addEventListener("change", () => {
+      if (r.checked) {
+        localStorage.setItem("taskPreference", r.value);
+        sendConfigUpdate({ task: r.value });
+      }
+    });
+  });
 }
 
 async function enumerateMicrophones() {
@@ -224,6 +246,9 @@ function setupWebSocket() {
 
     websocket.onopen = () => {
       statusText.textContent = "Connected to server.";
+      // Send initial task configuration on connection
+      const currentTask = localStorage.getItem("taskPreference") || "transcribe";
+      websocket.send(JSON.stringify({ task: currentTask }));
       resolve();
     };
 

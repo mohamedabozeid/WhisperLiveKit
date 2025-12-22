@@ -42,6 +42,21 @@
                     </select>
                 </div>
 
+                <div class="field">
+                    <label>Task</label>
+                    <div class="segmented" role="radiogroup" aria-label="Task selector">
+                        <input type="radio" id="task-transcribe" name="task" value="transcribe" checked />
+                        <label for="task-transcribe" title="Transcribe">
+                            <span>Transcribe</span>
+                        </label>
+                        <input type="radio" id="task-translate" name="task" value="translate" />
+                        <label for="task-translate" title="Translate">
+                            <img src="/web/src/translate.svg" alt="" style="width: 14px; height: 14px;" />
+                            <span>Translate</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="theme-selector-container">
                     <div class="segmented" role="radiogroup" aria-label="Theme selector">
                         <input type="radio" id="theme-system" name="theme" value="system" />
