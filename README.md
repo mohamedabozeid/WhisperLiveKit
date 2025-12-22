@@ -273,3 +273,8 @@ docker run --gpus all -p 8000:8000 --name wlk wlk --model large-v3 --language fr
 
 ## 🔮 Use Cases
 Capture discussions in real-time for meeting transcription, help hearing-impaired users follow conversations through accessibility tools, transcribe podcasts or videos automatically for content creation, transcribe support calls with speaker identification for customer service...
+
+
+whisperlivekit-server --language auto  --backend mlx-whisper --model large --task translate
+
+docker build --platform linux/amd64 -t mohamedabozeid/whisperlivekit:latest --push .
